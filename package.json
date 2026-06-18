@@ -1,0 +1,24 @@
+{
+  "name": "readback-gate",
+  "version": "0.1.0",
+  "description": "Coding agents read back what they understood, before they act on it. A runtime prompt gate for AI coding agents.",
+  "type": "module",
+  "bin": {
+    "readback-gate": "./src/cli.ts",
+    "readback-gate-codex": "./src/adapters/codex.ts"
+  },
+  "files": [
+    "src",
+    "install",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "smoke:cli": "node src/cli.ts \"이거 알아서 다 처리해줘\"",
+    "smoke:codex": "node src/adapters/codex.ts < test/fixtures/codex-ambiguous.json"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "license": "MIT"
+}
