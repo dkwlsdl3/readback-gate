@@ -4,6 +4,9 @@ import {
   doneConditionPatterns,
   hasActionVerb,
   hasConcreteTarget,
+  hasMutatingAction,
+  isNonExecutionIntent,
+  isReadOnlyStatusIntent,
   isSimpleReadOnly,
   matchesAny,
   unboundedScopePatterns,
@@ -26,8 +29,12 @@ interface Penalties {
 
 export function scorePrompt(prompt: string, options: ScoreOptions = {}): Report {
   const text = prompt.trim();
-  const simpleReadOnly = isSimpleReadOnly(text);
+  const mutatingAction = hasMutatingAction(text);
+  const simpleReadOnly = isSimpleReadOnly(text) && !mutatingAction;
   const riskLevel = classifyRisk(text);
+  const mediumReadOnlyStatus = riskLevel === 'medium' && isReadOnlyStatusIntent(text) && !mutatingAction;
+  const nonExecution =
+    isNonExecutionIntent(text) && !mutatingAction && (riskLevel === 'none' || riskLevel === 'low' || mediumReadOnlyStatus);
   const riskAcknowledged = acknowledgesRisk(text);
   const vagueGoal = matchesAny(text, vagueGoalPatterns);
   const unresolved = matchesAny(text, unresolvedReferencePatterns);
@@ -45,7 +52,7 @@ export function scorePrompt(prompt: string, options: ScoreOptions = {}): Report 
   const missing: string[] = [];
   const triggerReasons: string[] = [];
 
-  if (!simpleReadOnly && !hasActionVerb(text)) {
+  if (!simpleReadOnly && !nonExecution && !hasActionVerb(text)) {
     penalties.missing_goal = 22;
     missing.push('goal_clarity');
     triggerReasons.push('No clear action verb was detected.');
@@ -55,7 +62,7 @@ export function scorePrompt(prompt: string, options: ScoreOptions = {}): Report 
     triggerReasons.push('The requested action is vague or delegation-heavy.');
   }
 
-  if (!simpleReadOnly && !hasConcreteTarget(text)) {
+  if (!simpleReadOnly && !nonExecution && !hasConcreteTarget(text)) {
     penalties.missing_target += 32;
     missing.push('target_context');
     triggerReasons.push('No concrete file, path, symbol, module, or object was detected.');
@@ -75,7 +82,7 @@ export function scorePrompt(prompt: string, options: ScoreOptions = {}): Report 
     triggerReasons.push('The requested scope is broad or unbounded.');
   }
 
-  if (!simpleReadOnly && !done.matched && riskLevel !== 'low') {
+  if (!simpleReadOnly && !nonExecution && !done.matched && riskLevel !== 'low') {
     penalties.missing_done = riskLevel === 'none' ? 10 : 12;
     missing.push('done_condition');
     triggerReasons.push('No verifiable done condition or validation signal was detected.');

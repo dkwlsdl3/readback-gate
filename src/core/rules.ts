@@ -9,8 +9,13 @@ export const vagueGoalPatterns = [
 ];
 
 export const actionVerbPatterns = [
-  /\b(add|build|create|write|implement|fix|remove|delete|rename|update|refactor|test|run|check|review|explain|summarize|install|deploy|push|commit|list|show|print|open|read|find|search)\b/i,
-  /(추가|생성|작성|구현|수정|삭제|제거|이름\s*변경|업데이트|리팩터|리팩토|테스트|실행|확인|검토|설명|요약|설치|배포|푸시|커밋|목록|보여|출력|열어|읽어|찾아|검색)/i
+  /\b(add|build|create|write|implement|fix|remove|delete|rename|update|refactor|test|run|check|review|explain|summarize|install|deploy|push|commit|list|show|print|open|read|find|search|reset|wipe|nuke)\b/i,
+  /(추가|생성|작성|구현|수정|삭제|제거|이름\s*변경|업데이트|리팩터|리팩토|테스트|실행|확인|검토|설명|요약|설치|배포|푸시|커밋|목록|보여|출력|열어|읽어|찾아|검색|리셋|지우(?:다|고|워|자)?)/i
+];
+
+export const mutatingActionPatterns = [
+  /\b(add|create|write|implement|fix|remove|delete|rename|update|refactor|install|deploy|push|commit(?!\s+log)|reset|wipe|nuke|migrate|restart|publish|drop|truncate|apply|overwrite|merge|revert|rollback|move)\b/i,
+  /(추가|생성|작성|구현|수정|삭제|제거|이름\s*변경|업데이트|리팩터|리팩토|설치|배포|푸시|커밋(?!\s*로그)|리셋|지우(?:다|고|워|자)?|마이그레이션|재시작|초기화|적용|덮어(?:쓰다|써|쓰)?|머지|되돌리(?:다|기)|롤백|옮기(?:다|겨))/i
 ];
 
 export const concreteTargetPatterns = [
@@ -43,13 +48,13 @@ export const riskAcknowledgementPatterns = [
 ];
 
 export const highRiskPatterns = [
-  /\b(rm\s+-rf|delete|deletion|destroy|drop|truncate|reset\s+--hard|force\s+push|deploy|release|publish|production|prod|migrate|chmod\s+-R|chown\s+-R)\b/i,
+  /\b(rm\s+-rf|delete|deletion|destroy|drop|truncate|reset\s+--hard|force\s+push|deploy|release|publish|production|prod|migrate|chmod\s+-R|chown\s+-R|nuke)\b/i,
   /(삭제|초기화|폐기|드롭|강제\s*푸시|배포|릴리스|프로덕션|운영|마이그레이션|권한\s*변경)/i
 ];
 
 export const mediumRiskPatterns = [
-  /\b(push|commit|install|upgrade|write|edit|modify|replace|move|rename|restart|stop service|start service)\b/i,
-  /(푸시|커밋|설치|업그레이드|작성|편집|수정|교체|이동|이름\s*변경|재시작|중지|시작)/i
+  /\b(push|commit|install|upgrade|write|edit|modify|replace|move|rename|restart|stop service|start service|reset|wipe)\b/i,
+  /(푸시|커밋|설치|업그레이드|작성|편집|수정|교체|이동|이름\s*변경|재시작|중지|시작|리셋|지우(?:다|고|워|자)?)/i
 ];
 
 export const lowRiskPatterns = [
@@ -58,9 +63,27 @@ export const lowRiskPatterns = [
 ];
 
 export const simpleReadOnlyPatterns = [
-  /^\s*(ls|pwd|date|git\s+status|whoami|hostname)\b/i,
-  /^\s*run\s+(git\s+status|ls|pwd|date)\b/i,
-  /^\s*(현재\s*)?(시간|날짜|상태|목록)\s*(알려|보여|확인)?/i
+  /^\s*(ls|pwd|date|git\s+status|whoami|hostname)\s*[.!?]?\s*$/i,
+  /^\s*run\s+(git\s+status|ls|pwd|date)\s*[.!?]?\s*$/i,
+  /^\s*(현재\s*)?(시간|날짜|상태|목록)\s*(알려|보여|확인)?(?:줘|줘요|해줘)?\s*[.!?]?\s*$/i
+];
+
+export const nonExecutionIntentPatterns = [
+  /\?\s*$/,
+  /\b(?:what|why|how|where|when|who|which|does|is|are|can|should|could|would)\b/i,
+  /\bdo\s+(?:i|you|we|they|this|that|it|the|these|those)\b/i,
+  /(어때|뭐야|왜|어디|어떻게|되어\s*있|되고\s*있|통과해\s*\??)/i,
+  /^\s*(?:ㅇㅇ|ㅇㅋ|오케이|ok|okay|yes|yeah|thanks|great|g)\s*[!.]?\s*$/i,
+  /^\s*(?:ㅇㅇ|ㅇㅋ|오케이)\s*(?:그렇게\s*(?:하자|가자)|좋아|고마워요?)?[!.]?\s*$/i,
+  /^\s*(?:great|yeah)[\s,]+(?:thanks|that\s+makes\s+sense)[!.]?\s*$/i,
+  /(좋(?:다|네|아)|고마워|알겠|got\s+it|sounds\s+good)/i,
+  /(진행\s*상황|상태|보여줘|알려줘)/i,
+  /\b(?:show|summarize|list|status)\b/i
+];
+
+export const readOnlyStatusIntentPatterns = [
+  /(커밋\s*로그|로그\s*(?:보여|확인|요약)|진행\s*상황)/i,
+  /\b(?:git\s+status|commit\s+log|test\s+results?)\b/i
 ];
 
 export function matchesAny(prompt: string, patterns: RegExp[]): RuleMatch {
@@ -82,6 +105,18 @@ export function hasActionVerb(prompt: string): boolean {
   return matchesAny(prompt, actionVerbPatterns).matched;
 }
 
+export function hasMutatingAction(prompt: string): boolean {
+  return matchesAny(prompt, mutatingActionPatterns).matched;
+}
+
 export function isSimpleReadOnly(prompt: string): boolean {
   return matchesAny(prompt, simpleReadOnlyPatterns).matched;
+}
+
+export function isNonExecutionIntent(prompt: string): boolean {
+  return matchesAny(prompt, nonExecutionIntentPatterns).matched;
+}
+
+export function isReadOnlyStatusIntent(prompt: string): boolean {
+  return matchesAny(prompt, readOnlyStatusIntentPatterns).matched;
 }
