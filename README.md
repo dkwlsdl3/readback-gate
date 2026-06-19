@@ -1,57 +1,101 @@
 # readback-gate
 
-Coding agents read back what they understood, before they act on it. A runtime prompt gate that catches ambiguous tasks before your agent misunderstands them.
+> Your coding agent reads back what it understood — **before** it acts on it.
 
-## Before / After
+**English** · [한국어](README.ko.md)
 
-Before:
+A runtime prompt gate for AI coding agents. It catches ambiguous tasks the
+moment you hit enter — inside the loop, before the agent misreads them and
+edits the wrong thing.
+
+![status: pre-release](https://img.shields.io/badge/status-v0%20pre--release-orange)
+![license: MIT](https://img.shields.io/badge/license-MIT-blue)
+![node](https://img.shields.io/badge/node-%3E%3D24-green)
+![dependencies: none](https://img.shields.io/badge/deps-0-brightgreen)
+
+---
+
+## The problem
+
+You type *"just clean this up and handle it."* The agent confidently does the
+wrong thing — and you find out three file edits later.
+
+Other tools check your prompt in a browser, or lint your config files. None of
+them catch **the command you just typed, in the loop, before it runs.**
+
+## What it does
+
+**Before** — an ambiguous prompt:
 
 ```text
-이거 알아서 다 처리해줘
+just clean everything up and handle it
 ```
 
-`readback-gate` scores the prompt as low clarity and injects a concise instruction into the agent context:
+readback-gate scores it as low-clarity and injects a short instruction into the
+agent's context:
 
 ```text
 Readback-gate: clarity_score=16, risk_level=none, missing=goal_clarity, target_context, context_dependency, done_condition.
-Before executing, ask the user exactly one concise clarification question if the prompt is ambiguous.
+If the prompt is ambiguous, do not execute yet. First sync intent in this format:
+1. State the understood goal in one sentence.
+2. List 2-4 plausible interpretations as options.
+3. Recommend one with a short reason.
+4. Ask exactly one clarification question, then stop.
 ```
 
-After:
+**After** — a clear prompt passes untouched:
 
 ```text
-src/core/scorer.ts에서 risk_level 분류 테스트를 추가하고 npm test로 검증해줘
+Add a risk_level test to src/core/scorer.ts and verify with npm test
 ```
 
-That prompt passes because it has a target, bounded work, and a verification command.
+It has a target, bounded scope, and a verification command — so it passes.
 
-## What v0 Does
+## Why it's different
 
-- Deterministic local scoring only. The scoring path never calls an LLM or the network.
-- Codex-first `UserPromptSubmit` hook adapter.
-- Default mode: `inject`.
-- Optional modes: `silent`, `advisory`, `strict`.
-- Local JSONL telemetry for validity signals. Raw prompts are not stored.
-- Core and adapter boundaries are separate from day one. Claude Code support is a v1 adapter.
+|  | What it checks | When | Blocks? |
+|---|---|---|---|
+| Browser paste tools | prompt text | outside the loop | report only |
+| Config linters | static config files | commit / CI | file fix |
+| **readback-gate** | **the prompt you just typed** | **in the loop, pre-execution** | **inject (default) / opt-in block** |
 
-## CLI
+- **Deterministic & local.** The scoring path never calls an LLM or the network — same prompt, same score, every time.
+- **Inject, don't block.** Blocking your own command is paternalistic; injecting "read back first" is not. Hard blocking is opt-in (`strict`).
+- **Non-execution aware.** Questions, acknowledgements, and read-only queries pass through untouched.
+
+## Install
+
+> **Status: pre-release (v0).** Install from source. An `npx readback-gate`
+> package is on the roadmap (see [Roadmap](#roadmap)).
+
+Requires **Node ≥ 24** (uses native TypeScript execution).
 
 ```sh
-npx --no-install readback-gate "이거 알아서 다 처리해줘"
+git clone https://github.com/dkwlsdl3/readback-gate
+cd readback-gate
+npm install -g .          # installs `readback-gate` and `readback-gate-codex`
 ```
 
-Output includes a short human summary and a report JSON:
+## Usage
+
+### CLI
+
+```sh
+readback-gate "just clean everything up and handle it"
+```
+
+Prints a human summary plus a report JSON:
 
 ```json
 {
   "version": "0.1.0",
-  "clarity_score": 34,
+  "clarity_score": 16,
   "risk_level": "none",
   "verdict": "inject",
   "axes": {
-    "goal_clarity": 78,
-    "target_context": 60,
-    "scope_boundedness": 100,
+    "goal_clarity": 84,
+    "target_context": 68,
+    "scope_boundedness": 88,
     "done_condition": 90,
     "risk_side_effect": 100,
     "context_dependency": 88
@@ -62,68 +106,68 @@ Output includes a short human summary and a report JSON:
 }
 ```
 
-Use strict mode for opt-in blocking:
+### As a hook (Codex / Claude Code)
 
-```sh
-npx --no-install readback-gate --mode strict "이거 전부 삭제하고 초기화해줘"
-```
+Both agents speak the same `UserPromptSubmit` protocol, so the same adapter
+works for both. Register `readback-gate-codex` as a `UserPromptSubmit` hook —
+see [install/README.md](install/README.md) for the exact entries. The adapter:
 
-If clarity is below the threshold and `risk_level` is `high`, the process exits with code `2`.
+- emits `{"hookSpecificOutput":{...,"additionalContext":"..."}}` to inject, or
+- emits `{}` to pass through, or
+- in `strict` mode, prints a reason to stderr and exits `2` to block.
 
 ## Modes
 
-- `silent`: injects only one score/missing-signal line into context. No behavior instruction.
-- `inject`: injects score/missing signals plus a "ask before executing" instruction. This is the default.
-- `advisory`: prints a short report to stderr and continues.
-- `strict`: blocks only when `clarity_score < threshold` and `risk_level == high`; otherwise falls back to inject behavior.
+| Mode | Behavior |
+|---|---|
+| `silent` | Injects one score/missing-signal line. No instruction. |
+| `inject` **(default)** | Injects score/signals + the 4-step readback instruction. |
+| `advisory` | Prints a report to stderr and continues. |
+| `strict` | Blocks (`exit 2`) only when `clarity_score < threshold` **and** `risk_level == high`; otherwise behaves like `inject`. |
 
-## Codex Hook
+Configure via env: `READBACK_GATE_MODE`, `READBACK_GATE_THRESHOLD` (default 70),
+`READBACK_GATE_TELEMETRY`.
 
-The Codex adapter reads `UserPromptSubmit` JSON from stdin and writes either:
+## How scoring works
 
-- `{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"..."}}` on stdout for context injection
-- `{}` on stdout for pass-through prompts
-- a human report on stderr and exit code `2` for strict blocking
+`clarity_score` (0–100) is `100` minus deterministic penalties across six axes.
+A separate `risk_level` (`none`/`low`/`medium`/`high`) drives `strict` gating.
 
-Local clone command:
+| Axis | Penalized when… |
+|---|---|
+| goal clarity | vague verb (handle / sort out), or no action verb |
+| target/context | no concrete file, path, symbol, or module |
+| scope boundedness | unbounded scope (all / everything / entire) |
+| done condition | no verifiable completion signal |
+| risk / side-effect | destructive/remote/prod action with no acknowledgement |
+| context dependency | relies on unresolved references or prior turns |
 
-```sh
-node /absolute/path/to/readback-gate/src/adapters/codex.ts
-```
+Both English and Korean are detected. See [docs/spec-v0.md](docs/spec-v0.md) for
+the full model and [§13](docs/spec-v0.md) for known limitations.
 
-See [install/README.md](install/README.md) for hook registration options.
+## Privacy
 
-## Telemetry
+- **Raw prompts are never stored.** Only `prompt_hash`, length, score, risk,
+  verdict, and missing axes are recorded.
+- Telemetry is **local JSONL only** — no remote transmission.
 
-v0 records validity signals only. It does not analyze them yet.
+## Roadmap
 
-Events:
-
-- `prompt_scored`
-- `clarification_injected`
-- `clarification_asked`
-- `followup_prompt_seen`
-- `undo_or_revert_seen`
-- `strict_blocked`
-
-Privacy:
-
-- Raw prompts are never stored.
-- `prompt_hash`, `prompt_length`, score, risk, verdict, and missing axes are stored.
-- No remote telemetry exists.
-
-Override the telemetry path:
-
-```sh
-READBACK_GATE_TELEMETRY=.tmp/events.jsonl npx --no-install readback-gate "..."
-```
+- [ ] JS build step + `npm publish` → `npx readback-gate`
+- [ ] Dedicated Claude Code adapter (the boundary is already clean)
+- [ ] Validity analysis: does low clarity correlate with rework?
+- [ ] Tighten the mutating-verb denylist ([§13](docs/spec-v0.md))
 
 ## Development
 
-This project intentionally uses no npm dependencies in v0.
+No runtime dependencies.
 
 ```sh
 npm test
-node src/cli.ts "src/core/scorer.ts에서 테스트를 추가하고 npm test로 검증해줘"
+readback-gate "Add a test to src/core/scorer.ts and run npm test"
 READBACK_GATE_MODE=strict node src/adapters/codex.ts < test/fixtures/codex-ambiguous.json
 ```
+
+## License
+
+MIT
