@@ -3,6 +3,20 @@
   "version": "0.1.0",
   "description": "Coding agents read back what they understood, before they act on it. A runtime prompt gate for AI coding agents.",
   "type": "module",
+  "author": "dkwlsdl3",
+  "keywords": [
+    "ai",
+    "ai-agent",
+    "coding-agent",
+    "claude-code",
+    "codex",
+    "prompt",
+    "prompt-engineering",
+    "hook",
+    "guardrail",
+    "cli",
+    "developer-tools"
+  ],
   "bin": {
     "readback-gate": "./dist/cli.js",
     "readback-gate-codex": "./dist/adapters/codex.js"
@@ -25,6 +39,14 @@
     "node": ">=24.0.0"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dkwlsdl3/readback-gate.git"
+  },
+  "homepage": "https://github.com/dkwlsdl3/readback-gate#readme",
+  "bugs": {
+    "url": "https://github.com/dkwlsdl3/readback-gate/issues"
+  },
   "devDependencies": {
     "esbuild": "^0.28.1"
   }
