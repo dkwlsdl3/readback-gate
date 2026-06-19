@@ -12,7 +12,7 @@ structured readback so you confirm intent before the agent runs.
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node](https://img.shields.io/badge/node-%3E%3D24-green)
 ![dependencies: none](https://img.shields.io/badge/deps-0-brightgreen)
-![privacy: 100% local](https://img.shields.io/badge/privacy-100%25%20local-brightgreen)
+![telemetry: local-only](https://img.shields.io/badge/telemetry-local--only-brightgreen)
 
 Demo GIF source: [`assets/demo.tape`](assets/demo.tape). Render it with
 `npm run demo` to produce `assets/demo.gif` when `vhs` and `ffmpeg` are
@@ -157,15 +157,18 @@ the full model and [§13](docs/spec-v0.md) for known limitations.
 
 ## Privacy
 
-readback-gate runs **100% locally** by design:
+readback-gate adds **no data egress of its own**:
 
-- **No network in the default path.** Scoring is deterministic and offline — no
-  LLM, no API, no phone-home, no device fingerprint. Nothing about your prompts
-  ever leaves your machine.
+- **No network calls, no phone-home, no device fingerprint.** Scoring is
+  deterministic and offline; readback-gate never sends anything to a readback-gate
+  or third-party server.
 - **Raw prompts are never stored.** Telemetry records only a `prompt_hash`,
-  length, score, risk, verdict, and missing axes — to a **local JSONL file**,
-  never transmitted.
-- The optional LLM helpers (explanations / rewrites) are strictly opt-in.
+  length, score, risk, verdict, and missing axes — to a **local JSONL file**.
+- Optional LLM helpers (explanations / rewrites) are strictly opt-in.
+
+> Note: readback-gate runs *inside* your coding agent. Your agent still sends your
+> prompt — plus readback-gate's short injected line — to its own model provider,
+> exactly as it already does. readback-gate just adds **no new destination**.
 
 ## Status & honesty
 
