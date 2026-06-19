@@ -20,7 +20,7 @@ test('ambiguous prompt injects Codex hookSpecificOutput context', async () => {
 
   const payload = JSON.parse(result.stdout);
   assert.equal(payload.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
-  assert.match(payload.hookSpecificOutput.additionalContext, /Before executing, ask the user/);
+  assert.match(payload.hookSpecificOutput.additionalContext, /First sync intent in this format/);
 });
 
 test('clear prompt passes with empty JSON output', async () => {

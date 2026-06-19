@@ -32,7 +32,14 @@ export function renderAdditionalContext(report: Report, mode: Mode): string {
   ];
 
   if (mode === 'inject' || mode === 'strict') {
-    base.push('Before executing, ask the user exactly one concise clarification question if the prompt is ambiguous.');
+    base.push(
+      'If the prompt is ambiguous, do not execute yet. First sync intent in this format:',
+      '1. State the understood goal in one sentence.',
+      '2. List 2-4 plausible interpretations as options.',
+      '3. Recommend one with a short reason.',
+      '4. Ask exactly one clarification question, then stop.',
+      'Skip this for simple chat or a clearly-scoped single command.'
+    );
     if (report.suggested_questions.length > 0) {
       base.push(`Suggested questions: ${report.suggested_questions.join(' | ')}`);
     }
