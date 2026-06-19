@@ -4,9 +4,9 @@
 
 **English** · [한국어](README.ko.md)
 
-A runtime prompt gate for AI coding agents. It catches ambiguous tasks the
-moment you hit enter — inside the loop, before the agent misreads them and
-edits the wrong thing.
+A runtime prompt gate for AI coding agents. It deterministically flags
+low-clarity prompts the moment you hit enter — inside the loop — and injects a
+structured readback so you confirm intent before the agent runs.
 
 ![status: pre-release](https://img.shields.io/badge/status-v0%20pre--release-orange)
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
@@ -160,10 +160,20 @@ the full model and [§13](docs/spec-v0.md) for known limitations.
   verdict, and missing axes are recorded.
 - Telemetry is **local JSONL only** — no remote transmission.
 
+## Status & honesty
+
+readback-gate reliably does what it says: deterministic scoring plus a
+structured readback on low-clarity prompts. What it does **not** yet have is
+evidence that this reduces real mistakes — a backtest over ~3,700 real prompts
+found **no correlation** between clarity score and later rework. So treat it
+today as a *pause-and-confirm* aid, not a proven error preventer. Whether
+intervening actually helps is an open question, to be tested with an on/off A/B.
+
 ## Roadmap
 
+- [ ] A/B (gate on vs off) to measure whether injecting actually reduces rework
 - [ ] Dedicated Claude Code adapter (the boundary is already clean)
-- [ ] Validity analysis: does low clarity correlate with rework?
+- [ ] Re-derive the score from what actually predicts rework (if the A/B is positive)
 - [ ] Tighten the mutating-verb denylist ([§13](docs/spec-v0.md))
 
 ## Development
