@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scorePrompt } from './core/scorer.ts';
 import { normalizeMode, renderHumanSummary } from './core/modes.ts';
 import { recordTelemetry } from './core/telemetry.ts';
@@ -62,7 +62,20 @@ function parseArgs(argv: string[]): CliArgs {
   return { mode, threshold, jsonOnly, telemetryPath, prompt };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  if (import.meta.url === pathToFileURL(entry).href) return true;
+  // npm installs bins as symlinks, so argv[1] (the bin) differs from the real
+  // module path. Compare resolved real paths to detect direct execution.
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(entry);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   const args = parseArgs(process.argv.slice(2));
   const report = scorePrompt(args.prompt, { mode: args.mode, threshold: args.threshold });
   recordTelemetry('prompt_scored', args.prompt, report, args.telemetryPath);

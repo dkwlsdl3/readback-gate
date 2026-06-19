@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PromptAdapter, ScoreOptions } from '../core/types.ts';
 import { scorePrompt } from '../core/scorer.ts';
 import { normalizeMode, renderAdditionalContext, renderHumanSummary } from '../core/modes.ts';
@@ -77,7 +77,20 @@ export const codexAdapter: PromptAdapter = {
   }
 };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  if (import.meta.url === pathToFileURL(entry).href) return true;
+  // npm installs bins as symlinks, so argv[1] (the bin) differs from the real
+  // module path. Compare resolved real paths to detect direct execution.
+  try {
+    return fileURLToPath(import.meta.url) === realpathSync(entry);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
   const input = readFileSync(0, 'utf8');
   const result = await codexAdapter.run(input);
   if (result.stdout) process.stdout.write(result.stdout);
