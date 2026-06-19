@@ -4,15 +4,19 @@
   "description": "Coding agents read back what they understood, before they act on it. A runtime prompt gate for AI coding agents.",
   "type": "module",
   "bin": {
-    "readback-gate": "./src/cli.ts",
-    "readback-gate-codex": "./src/adapters/codex.ts"
+    "readback-gate": "./dist/cli.js",
+    "readback-gate-codex": "./dist/adapters/codex.js"
   },
   "files": [
-    "src",
+    "dist",
     "install",
-    "README.md"
+    "README.md",
+    "README.ko.md"
   ],
   "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepublishOnly": "npm run build",
+    "prepack": "npm run build",
     "test": "node --test test/*.test.ts",
     "smoke:cli": "node src/cli.ts \"이거 알아서 다 처리해줘\"",
     "smoke:codex": "node src/adapters/codex.ts < test/fixtures/codex-ambiguous.json"
@@ -20,5 +24,8 @@
   "engines": {
     "node": ">=24.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
 }
