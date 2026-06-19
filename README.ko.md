@@ -11,6 +11,7 @@ AI 코딩 에이전트를 위한 런타임 프롬프트 게이트. 방금 입력
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node](https://img.shields.io/badge/node-%3E%3D24-green)
 ![dependencies: none](https://img.shields.io/badge/deps-0-brightgreen)
+![privacy: 100% local](https://img.shields.io/badge/privacy-100%25%20local-brightgreen)
 
 데모 GIF 소스: [`assets/demo.tape`](assets/demo.tape). `vhs`와 `ffmpeg`가
 있으면 `npm run demo`로 `assets/demo.gif`를 렌더할 수 있다.
@@ -151,9 +152,13 @@ npx readback-gate install
 
 ## 프라이버시
 
-- **원문 프롬프트는 절대 저장하지 않는다.** `prompt_hash`, 길이, 점수, 위험도,
-  verdict, 결손 축만 기록한다.
-- 텔레메트리는 **로컬 JSONL 전용** — 원격 전송 없음.
+readback-gate는 설계상 **100% 로컬**이다:
+
+- **기본 경로에 네트워크 없음.** 채점은 결정적·오프라인 — LLM·API·phone-home·기기
+  핑거프린트 전부 없다. 프롬프트에 관한 어떤 것도 기기를 떠나지 않는다.
+- **원문 프롬프트는 절대 저장하지 않는다.** 텔레메트리는 `prompt_hash`, 길이, 점수,
+  위험도, verdict, 결손 축만 **로컬 JSONL 파일**에 기록하며, 전송하지 않는다.
+- 선택적 LLM 보조(설명/재작성)는 철저히 opt-in이다.
 
 ## 상태 & 정직성
 

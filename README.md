@@ -12,6 +12,7 @@ structured readback so you confirm intent before the agent runs.
 ![license: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![node](https://img.shields.io/badge/node-%3E%3D24-green)
 ![dependencies: none](https://img.shields.io/badge/deps-0-brightgreen)
+![privacy: 100% local](https://img.shields.io/badge/privacy-100%25%20local-brightgreen)
 
 Demo GIF source: [`assets/demo.tape`](assets/demo.tape). Render it with
 `npm run demo` to produce `assets/demo.gif` when `vhs` and `ffmpeg` are
@@ -156,9 +157,15 @@ the full model and [§13](docs/spec-v0.md) for known limitations.
 
 ## Privacy
 
-- **Raw prompts are never stored.** Only `prompt_hash`, length, score, risk,
-  verdict, and missing axes are recorded.
-- Telemetry is **local JSONL only** — no remote transmission.
+readback-gate runs **100% locally** by design:
+
+- **No network in the default path.** Scoring is deterministic and offline — no
+  LLM, no API, no phone-home, no device fingerprint. Nothing about your prompts
+  ever leaves your machine.
+- **Raw prompts are never stored.** Telemetry records only a `prompt_hash`,
+  length, score, risk, verdict, and missing axes — to a **local JSONL file**,
+  never transmitted.
+- The optional LLM helpers (explanations / rewrites) are strictly opt-in.
 
 ## Status & honesty
 
