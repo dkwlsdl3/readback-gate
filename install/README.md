@@ -1,42 +1,56 @@
-# Codex Installation
+# Hook Installation
 
-`readback-gate` v0 targets Codex `UserPromptSubmit` first.
+`readback-gate` registers a `UserPromptSubmit` hook for Codex and Claude Code.
 
-## Local Clone
+## One-line Install
 
-From this repository:
+```sh
+npx readback-gate install
+```
+
+When no target flag is provided, the installer detects existing config files:
+
+- Codex: `~/.codex/hooks.json`
+- Claude Code: `~/.claude/settings.json`
+
+If neither file exists, it defaults to Codex. To force a target:
+
+```sh
+npx readback-gate install --codex
+npx readback-gate install --claude
+npx readback-gate install --codex --claude
+```
+
+## Options
+
+```sh
+npx readback-gate install [--codex] [--claude] [--mode inject|silent|advisory|strict] [--threshold N] [--dry-run] [--uninstall]
+```
+
+- `--dry-run` prints the planned result without writing files.
+- `--uninstall` removes existing readback-gate hooks.
+- `--mode` and `--threshold` encode hook-time `READBACK_GATE_MODE` and
+  `READBACK_GATE_THRESHOLD` only when they differ from defaults.
+
+The registered command uses absolute paths and does not depend on `PATH`:
+
+```sh
+"/absolute/path/to/node" "/absolute/path/to/readback-gate/dist/adapters/codex.js"
+```
+
+## Test Fixtures
+
+Tests can override config paths without touching real global settings:
+
+```sh
+READBACK_GATE_CODEX_HOOKS_PATH=/tmp/hooks.json npx readback-gate install --codex
+READBACK_GATE_CLAUDE_SETTINGS_PATH=/tmp/settings.json npx readback-gate install --claude
+```
+
+The legacy source installer remains available for local checkouts:
 
 ```sh
 node install/codex-install.mjs --dry-run
-node install/codex-install.mjs
-```
-
-The installer adds this command to `~/.codex/hooks.json` under `UserPromptSubmit`,
-using the absolute path of your local clone (resolved automatically):
-
-```sh
-node /absolute/path/to/readback-gate/src/adapters/codex.ts
-```
-
-## Manual Hook Entry
-
-Add a `UserPromptSubmit` hook that runs (use the absolute path of your clone):
-
-```sh
-node /absolute/path/to/readback-gate/src/adapters/codex.ts
-```
-
-Recommended defaults:
-
-```sh
-READBACK_GATE_MODE=inject
-READBACK_GATE_THRESHOLD=70
-```
-
-Strict mode is opt-in:
-
-```sh
-READBACK_GATE_MODE=strict
 ```
 
 ## Verification
@@ -44,17 +58,17 @@ READBACK_GATE_MODE=strict
 Ambiguous prompt should inject context:
 
 ```sh
-echo '{"prompt":"이거 알아서 다 처리해줘"}' | node src/adapters/codex.ts
+echo '{"prompt":"이거 알아서 다 처리해줘"}' | node dist/adapters/codex.js
 ```
 
 Clear prompt should pass silently:
 
 ```sh
-echo '{"prompt":"src/core/scorer.ts에서 테스트를 추가하고 npm test로 검증해줘"}' | node src/adapters/codex.ts
+echo '{"prompt":"src/core/scorer.ts에서 테스트를 추가하고 npm test로 검증해줘"}' | node dist/adapters/codex.js
 ```
 
 Strict high-risk prompt should exit `2`:
 
 ```sh
-echo '{"prompt":"이거 전부 삭제하고 초기화해줘"}' | READBACK_GATE_MODE=strict node src/adapters/codex.ts
+echo '{"prompt":"이거 전부 삭제하고 초기화해줘"}' | READBACK_GATE_MODE=strict node dist/adapters/codex.js
 ```

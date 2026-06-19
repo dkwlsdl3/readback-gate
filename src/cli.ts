@@ -5,6 +5,7 @@ import { scorePrompt } from './core/scorer.ts';
 import { normalizeMode, renderHumanSummary } from './core/modes.ts';
 import { recordTelemetry } from './core/telemetry.ts';
 import type { Mode } from './core/types.ts';
+import { parseInstallArgs, runInstall } from './install.ts';
 
 interface CliArgs {
   mode: Mode;
@@ -76,7 +77,20 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) {
-  const args = parseArgs(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  if (argv[0] === 'install') {
+    try {
+      const options = parseInstallArgs(argv.slice(1), import.meta.url);
+      const results = runInstall(options);
+      console.log(JSON.stringify({ results }, null, 2));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  const args = parseArgs(argv);
   const report = scorePrompt(args.prompt, { mode: args.mode, threshold: args.threshold });
   recordTelemetry('prompt_scored', args.prompt, report, args.telemetryPath);
   if (report.verdict === 'inject') {

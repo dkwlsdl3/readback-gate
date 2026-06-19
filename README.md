@@ -13,6 +13,10 @@ edits the wrong thing.
 ![node](https://img.shields.io/badge/node-%3E%3D24-green)
 ![dependencies: none](https://img.shields.io/badge/deps-0-brightgreen)
 
+Demo GIF source: [`assets/demo.tape`](assets/demo.tape). Render it with
+`npm run demo` to produce `assets/demo.gif` when `vhs` and `ffmpeg` are
+available.
+
 ---
 
 ## The problem
@@ -65,16 +69,15 @@ It has a target, bounded scope, and a verification command — so it passes.
 
 ## Install
 
-> **Status: pre-release (v0).** Install from source. An `npx readback-gate`
-> package is on the roadmap (see [Roadmap](#roadmap)).
-
-Requires **Node ≥ 24** (uses native TypeScript execution).
+Requires **Node ≥ 24**.
 
 ```sh
-git clone https://github.com/dkwlsdl3/readback-gate
-cd readback-gate
-npm install -g .          # installs `readback-gate` and `readback-gate-codex`
+npx readback-gate install
 ```
+
+The installer auto-detects existing Codex and Claude Code config files. Use
+`--codex` or `--claude` to force a target, `--dry-run` to preview, and
+`--uninstall` to remove the hook.
 
 ## Usage
 
@@ -109,8 +112,14 @@ Prints a human summary plus a report JSON:
 ### As a hook (Codex / Claude Code)
 
 Both agents speak the same `UserPromptSubmit` protocol, so the same adapter
-works for both. Register `readback-gate-codex` as a `UserPromptSubmit` hook —
-see [install/README.md](install/README.md) for the exact entries. The adapter:
+works for both. Register it with one command:
+
+```sh
+npx readback-gate install
+```
+
+See [install/README.md](install/README.md) for target-specific options. The
+adapter:
 
 - emits `{"hookSpecificOutput":{...,"additionalContext":"..."}}` to inject, or
 - emits `{}` to pass through, or
@@ -153,7 +162,6 @@ the full model and [§13](docs/spec-v0.md) for known limitations.
 
 ## Roadmap
 
-- [ ] JS build step + `npm publish` → `npx readback-gate`
 - [ ] Dedicated Claude Code adapter (the boundary is already clean)
 - [ ] Validity analysis: does low clarity correlate with rework?
 - [ ] Tighten the mutating-verb denylist ([§13](docs/spec-v0.md))
@@ -164,6 +172,7 @@ No runtime dependencies.
 
 ```sh
 npm test
+npm run demo
 readback-gate "Add a test to src/core/scorer.ts and run npm test"
 READBACK_GATE_MODE=strict node src/adapters/codex.ts < test/fixtures/codex-ambiguous.json
 ```

@@ -1,7 +1,7 @@
 import { chmodSync, readFileSync, rmSync } from 'node:fs';
 import { build } from 'esbuild';
 
-const entryPoints = ['src/cli.ts', 'src/adapters/codex.ts'];
+const entryPoints = ['src/cli.ts', 'src/adapters/codex.ts', 'src/install.ts'];
 const binOutputs = ['dist/cli.js', 'dist/adapters/codex.js'];
 const shebang = '#!/usr/bin/env node';
 

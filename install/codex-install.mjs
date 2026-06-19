@@ -1,42 +1,17 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const dryRun = process.argv.includes('--dry-run');
-const repoRoot = resolve(new URL('..', import.meta.url).pathname);
-const hooksPath = process.env.CODEX_HOOKS_PATH ?? `${homedir()}/.codex/hooks.json`;
-const command = `"${process.execPath}" "${repoRoot}/src/adapters/codex.ts"`;
+const distInstall = resolve(new URL('..', import.meta.url).pathname, 'dist/install.js');
+const sourceInstall = resolve(new URL('..', import.meta.url).pathname, 'src/install.ts');
+const installModule = await import(pathToFileURL(existsSync(distInstall) ? distInstall : sourceInstall).href);
 
-const hook = {
-  hooks: [
-    {
-      type: 'command',
-      command
-    }
-  ]
-};
-
-const config = existsSync(hooksPath)
-  ? JSON.parse(readFileSync(hooksPath, 'utf8'))
-  : { hooks: {} };
-
-config.hooks ??= {};
-config.hooks.UserPromptSubmit ??= [];
-
-const alreadyInstalled = config.hooks.UserPromptSubmit.some((entry) =>
-  JSON.stringify(entry).includes('/src/adapters/codex.ts')
-);
-
-if (!alreadyInstalled) {
-  config.hooks.UserPromptSubmit.push(hook);
+try {
+  const options = installModule.parseInstallArgs(['--codex', ...process.argv.slice(2)], import.meta.url);
+  const results = installModule.runInstall(options);
+  console.log(JSON.stringify({ results }, null, 2));
+} catch (error) {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
 }
-
-if (dryRun) {
-  console.log(JSON.stringify({ hooksPath, alreadyInstalled, hook }, null, 2));
-  process.exit(0);
-}
-
-mkdirSync(dirname(hooksPath), { recursive: true });
-writeFileSync(hooksPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
-console.log(alreadyInstalled ? 'readback-gate Codex hook already installed' : 'readback-gate Codex hook installed');
