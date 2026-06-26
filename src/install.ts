@@ -11,6 +11,7 @@ export interface InstallOptions {
   targets: InstallTarget[];
   mode: Mode;
   threshold: number;
+  dualRunCapture: boolean;
   dryRun: boolean;
   uninstall: boolean;
   nodePath: string;
@@ -93,10 +94,11 @@ function makeClaudeHook(command: string): JsonObject {
   };
 }
 
-function applyModeEnv(command: string, mode: Mode, threshold: number): string {
+function applyEnv(command: string, envVars: Record<string, string | undefined>): string {
   const env: string[] = [];
-  if (mode !== DEFAULT_MODE) env.push(`READBACK_GATE_MODE=${mode}`);
-  if (threshold !== DEFAULT_THRESHOLD) env.push(`READBACK_GATE_THRESHOLD=${threshold}`);
+  for (const [key, value] of Object.entries(envVars)) {
+    if (value !== undefined) env.push(`${key}=${value}`);
+  }
   return env.length === 0 ? command : `${env.join(' ')} ${command}`;
 }
 
@@ -104,8 +106,41 @@ function quoteShell(value: string): string {
   return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
-export function buildHookCommand(nodePath: string, adapterPath: string, mode = DEFAULT_MODE, threshold = DEFAULT_THRESHOLD): string {
-  return applyModeEnv(`${quoteShell(nodePath)} ${quoteShell(adapterPath)}`, mode, threshold);
+export function buildHookCommand(
+  nodePath: string,
+  adapterPath: string,
+  mode = DEFAULT_MODE,
+  threshold = DEFAULT_THRESHOLD,
+  extraEnv: Record<string, string | undefined> = {}
+): string {
+  return applyEnv(`${quoteShell(nodePath)} ${quoteShell(adapterPath)}`, {
+    ...(mode !== DEFAULT_MODE ? { READBACK_GATE_MODE: mode } : {}),
+    ...(threshold !== DEFAULT_THRESHOLD ? { READBACK_GATE_THRESHOLD: String(threshold) } : {}),
+    ...extraEnv
+  });
+}
+
+function targetHookCommand(options: InstallOptions, target: InstallTarget): string {
+  return buildHookCommand(options.nodePath, options.adapterPath, options.mode, options.threshold, options.dualRunCapture
+    ? {
+        READBACK_GATE_DUALRUN_CAPTURE: '1',
+        READBACK_GATE_DUALRUN_AGENT: target
+      }
+    : {});
+}
+
+function replaceReadbackGateHooks(entry: unknown, command: string): unknown {
+  if (!isObject(entry)) return entry;
+  const hooks = entry.hooks;
+  if (!Array.isArray(hooks)) return entry;
+  if (!hooks.some((hook) => commandNeedsRemoval(hookCommand(hook)))) return entry;
+  return {
+    ...entry,
+    hooks: [
+      ...hooks.filter((hook) => !commandNeedsRemoval(hookCommand(hook))),
+      { type: 'command', command }
+    ]
+  };
 }
 
 export function transformCodexHooksConfig(config: unknown, command: string, uninstall = false): JsonObject {
@@ -118,7 +153,7 @@ export function transformCodexHooksConfig(config: unknown, command: string, unin
   const nextUserPromptSubmit = uninstall
     ? userPromptSubmit.map(withoutReadbackGateHooks).filter((entry) => entry !== undefined)
     : hasInstalledCommand(userPromptSubmit)
-      ? userPromptSubmit
+      ? userPromptSubmit.map((entry) => replaceReadbackGateHooks(entry, command))
       : [...userPromptSubmit, makeHook(command)];
 
   return {
@@ -142,7 +177,7 @@ export function transformClaudeSettingsConfig(config: unknown, command: string, 
       .map(withoutReadbackGateHooks)
       .filter((entry) => entry !== undefined);
   } else if (hasInstalledCommand(userPromptSubmit)) {
-    nextUserPromptSubmit = userPromptSubmit;
+    nextUserPromptSubmit = userPromptSubmit.map((entry) => replaceReadbackGateHooks(entry, command));
   } else {
     const matcherIndex = userPromptSubmit.findIndex((entry) =>
       isObject(entry) && entry.matcher === '*' && Array.isArray(entry.hooks)
@@ -223,6 +258,7 @@ export function parseInstallArgs(argv: string[], moduleUrl = import.meta.url): I
   const explicitTargets = new Set<InstallTarget>();
   let mode: Mode = DEFAULT_MODE;
   let threshold = DEFAULT_THRESHOLD;
+  let dualRunCapture = false;
   let dryRun = false;
   let uninstall = false;
 
@@ -240,6 +276,8 @@ export function parseInstallArgs(argv: string[], moduleUrl = import.meta.url): I
       threshold = Number(argv[++index]);
     } else if (arg.startsWith('--threshold=')) {
       threshold = Number(arg.slice('--threshold='.length));
+    } else if (arg === '--dual-run-capture') {
+      dualRunCapture = true;
     } else if (arg === '--dry-run') {
       dryRun = true;
     } else if (arg === '--uninstall') {
@@ -263,6 +301,7 @@ export function parseInstallArgs(argv: string[], moduleUrl = import.meta.url): I
     targets,
     mode,
     threshold,
+    dualRunCapture,
     dryRun,
     uninstall,
     nodePath: realpathSync(process.execPath),
@@ -273,8 +312,8 @@ export function parseInstallArgs(argv: string[], moduleUrl = import.meta.url): I
 }
 
 export function runInstall(options: InstallOptions): InstallResult[] {
-  const command = buildHookCommand(options.nodePath, options.adapterPath, options.mode, options.threshold);
   return options.targets.map((target) => {
+    const command = targetHookCommand(options, target);
     const path = target === 'codex' ? options.codexHooksPath : options.claudeSettingsPath;
     const { config, indent } = parseJsonFile(path);
     const nextConfig = target === 'codex'

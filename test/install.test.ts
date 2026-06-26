@@ -182,3 +182,28 @@ test('install writes Codex and Claude fixture configs through env overrides', ()
   assert.equal(JSON.parse(readFileSync(codexPath, 'utf8')).hooks.UserPromptSubmit.length, 1);
   assert.equal(JSON.parse(readFileSync(claudePath, 'utf8')).hooks.UserPromptSubmit[0].hooks.length, 1);
 });
+
+test('install --dual-run-capture updates existing hooks with target-specific capture env', () => {
+  const dir = tempDir();
+  const codexPath = join(dir, 'codex-hooks.json');
+  const claudePath = join(dir, 'claude-settings.json');
+  writeFileSync(codexPath, JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ type: 'command', command }] }] } }, null, 2), 'utf8');
+  writeFileSync(claudePath, JSON.stringify({ hooks: { UserPromptSubmit: [{ matcher: '*', hooks: [{ type: 'command', command }] }] } }, null, 2), 'utf8');
+
+  execFileSync(process.execPath, ['src/cli.ts', 'install', '--codex', '--claude', '--dual-run-capture'], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      READBACK_GATE_CODEX_HOOKS_PATH: codexPath,
+      READBACK_GATE_CLAUDE_SETTINGS_PATH: claudePath
+    }
+  });
+
+  const codexCommand = JSON.parse(readFileSync(codexPath, 'utf8')).hooks.UserPromptSubmit[0].hooks[0].command;
+  const claudeCommand = JSON.parse(readFileSync(claudePath, 'utf8')).hooks.UserPromptSubmit[0].hooks[0].command;
+  assert.match(codexCommand, /READBACK_GATE_DUALRUN_CAPTURE=1/);
+  assert.match(codexCommand, /READBACK_GATE_DUALRUN_AGENT=codex/);
+  assert.match(claudeCommand, /READBACK_GATE_DUALRUN_CAPTURE=1/);
+  assert.match(claudeCommand, /READBACK_GATE_DUALRUN_AGENT=claude/);
+});

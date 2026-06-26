@@ -29,6 +29,8 @@ npx readback-gate install [--codex] [--claude] [--mode inject|silent|advisory|st
 
 - `--dry-run` prints the planned result without writing files.
 - `--uninstall` removes existing readback-gate hooks.
+- `--dual-run-capture` makes the hook append injected/gated prompt candidates to
+  the dual-run queue for later worker processing.
 - `--mode` and `--threshold` encode hook-time `READBACK_GATE_MODE` and
   `READBACK_GATE_THRESHOLD` only when they differ from defaults.
 
@@ -37,6 +39,29 @@ The registered command uses absolute paths and does not depend on `PATH`:
 ```sh
 "/absolute/path/to/node" "/absolute/path/to/readback-gate/dist/adapters/codex.js"
 ```
+
+With `--dual-run-capture`, the command also includes target-specific env:
+
+```sh
+READBACK_GATE_DUALRUN_CAPTURE=1 READBACK_GATE_DUALRUN_AGENT=claude "/absolute/path/to/node" "/absolute/path/to/readback-gate/dist/adapters/codex.js"
+```
+
+Capture does not run another agent inside the hook. It only writes queue entries
+under `~/.local/state/readback-gate/dualrun-queue.jsonl` and prompt/transcript
+snapshots under `~/.local/state/readback-gate/dualrun-captures/`. Process them
+with a separate worker:
+
+```sh
+readback-gate-dual-run-worker \
+  --watch \
+  --interval-sec 60 \
+  --claude-cmd "claude" \
+  --codex-cmd "codex exec"
+```
+
+Dual-run artifacts default to `/tmp/readback-gate-dualrun/<pair-id>/`. Each pair
+contains separate baseline and gated replicas, so the source project directory is
+not used as either branch cwd.
 
 ## Test Fixtures
 

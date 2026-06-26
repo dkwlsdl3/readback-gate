@@ -126,6 +126,134 @@ adapter:
 - emits `{}` to pass through, or
 - in `strict` mode, prints a reason to stderr and exits `2` to block.
 
+### Measuring effect with dual-run (experimental)
+
+`readback-gate-dual-run` records paired artifacts for the same prompt:
+
+- `gated_visible`: the prompt plus readback-gate's injected context
+- `baseline_replica`: the same prompt/context in a cloned replica with
+  `READBACK_GATE_DISABLE=1`
+
+The agent under test can be Claude Code, Codex, or another coding agent. Record
+that with `--agent claude|codex|custom`; it is analysis metadata only. The
+treatment variable remains readback-gate on/off: baseline runs with
+`READBACK_GATE_DISABLE=1`, while gated runs receive the readback-gate injection.
+
+```sh
+readback-gate-dual-run \
+  --prompt "README.md 이거 좀 알아서 고쳐줘" \
+  --context-file /tmp/full-transcript.txt \
+  --context-fidelity full_transcript \
+  --agent claude \
+  --baseline-cmd "claude" \
+  --gated-cmd "claude" \
+  --require-primary
+```
+
+Replace `claude` with the command that runs the target agent for one prompt, for
+example `codex exec` for Codex or a custom wrapper script. The runner feeds both
+branches the same generated input file on stdin.
+
+The runner writes `summary.json`, branch inputs, stdout/stderr, git diffs, and
+status files under `/tmp/readback-gate-dualrun` by default. A pair is
+`acceptance.primaryEligible=true` only when both branches ran, the prompt got an
+actual readback-gate treatment, and the supplied context is marked
+`full_transcript` from `--context-file`. Inline, summary, truncated, or
+no-context pairs are retained for debugging but excluded from primary effect
+claims.
+
+Artifacts are redacted with `--redaction basic` by default for common token/key
+patterns. Use `--redaction off` only when you need byte-for-byte review
+artifacts and can protect the artifact root.
+
+Aggregate accepted pairs with labels:
+
+```sh
+readback-gate-dual-run-report \
+  --artifacts-root /tmp/readback-gate-dualrun \
+  --labels labels.jsonl \
+  --min-labeled 30 \
+  --require-ready
+```
+
+`labels.jsonl` uses one JSON object per line:
+
+```json
+{"pairId":"...","verdict":"gated_better","reviewer":"alice","confidence":"high"}
+```
+
+Allowed verdicts are `gated_better`, `baseline_better`, `same`, `both_bad`, and
+`exclude`. Use `--prepare-review <dir>` to create blinded `arm_a` / `arm_b`
+review packs for primary-eligible unlabeled pairs.
+
+You can run an AI first-pass labeler over that blind review pack. The labeler
+only sees `arm_a` and `arm_b`; `readback-gate-dual-run-label` reads
+`manifest.private.json` afterward and writes mapped `gated_better` /
+`baseline_better` labels. Labeler subprocesses run with `READBACK_GATE_DISABLE=1`
+to avoid recursively queuing the labeling prompt:
+
+```sh
+readback-gate-dual-run-report \
+  --artifacts-root /tmp/readback-gate-dualrun \
+  --prepare-review /tmp/readback-gate-review
+
+readback-gate-dual-run-label \
+  --review-dir /tmp/readback-gate-review \
+  --labels labels.jsonl \
+  --audit audit.jsonl \
+  --labeler-cmd "codex exec --sandbox read-only" \
+  --reviewer ai-codex
+```
+
+Treat AI labels as triage, not final proof. Human-review at least a 10-20%
+sample, plus every `confidence=low`, `exclude`, `both_bad`, or AI-disagreement
+case, before making public claims.
+
+For a multi-day live experiment, enable capture in the hook and run the worker:
+
+```sh
+readback-gate install --codex --claude --dual-run-capture
+
+readback-gate-dual-run-worker \
+  --watch \
+  --interval-sec 60 \
+  --auth-bridge codex_symlink \
+  --claude-cmd "claude" \
+  --codex-cmd "codex exec"
+```
+
+The hook only queues prompt candidates; it does not run a second agent inside
+the live session. The worker creates `/tmp/readback-gate-dualrun/<pair-id>/`
+artifacts and runs both baseline and gated branches inside separate replica
+directories.
+
+`--auth-bridge codex_symlink` is optional and only applies to Codex queue
+entries. It creates `.codex/auth.json` symlinks inside the isolated branch
+homes so `codex exec` can authenticate without inheriting the whole user
+environment. This deliberately exposes the local Codex auth token to branch
+agents and leaves symlinks under the pair artifact directory; keep those
+artifacts local and delete them after review.
+
+Cleanup is required after a measurement window. Pair directories can contain
+full transcripts, stdout/stderr, diffs, and auth symlinks. After exporting the
+labels or report you need, delete reviewed artifacts:
+
+```sh
+rm -rf /tmp/readback-gate-dualrun/<pair-id>
+# or, after the whole experiment:
+rm -rf /tmp/readback-gate-dualrun
+```
+
+Important limits: the replica is a workspace snapshot, not an OS network
+sandbox. The runner uses a minimal baseline environment and `--command-guard
+remote_write` by default, which blocks common remote commands such as `curl`,
+`wget`, `ssh`, `rsync`, `gh`, and remote git subcommands like `git push`.
+That is a command shim, not a kernel/network sandbox; production APIs can still
+be reached through unrecognized binaries or code-level network libraries unless
+you wrap the run in an external sandbox. Artifacts may contain prompts, context,
+diffs, stdout, stderr, or secrets even after best-effort redaction, so keep the
+artifact root local and delete it after review.
+
 ## Modes
 
 | Mode | Behavior |
@@ -181,7 +309,7 @@ intervening actually helps is an open question, to be tested with an on/off A/B.
 
 ## Roadmap
 
-- [ ] A/B (gate on vs off) to measure whether injecting actually reduces rework
+- [ ] A/B / accepted dual-run dataset to measure whether injecting actually reduces rework
 - [ ] Dedicated Claude Code adapter (the boundary is already clean)
 - [ ] Re-derive the score from what actually predicts rework (if the A/B is positive)
 - [ ] Tighten the mutating-verb denylist ([§13](docs/spec-v0.md))

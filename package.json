@@ -19,7 +19,11 @@
   ],
   "bin": {
     "readback-gate": "./dist/cli.js",
-    "readback-gate-codex": "./dist/adapters/codex.js"
+    "readback-gate-codex": "./dist/adapters/codex.js",
+    "readback-gate-dual-run": "./dist/dualrun.js",
+    "readback-gate-dual-run-report": "./dist/dualrun-report.js",
+    "readback-gate-dual-run-label": "./dist/dualrun-label.js",
+    "readback-gate-dual-run-worker": "./dist/dualrun-worker.js"
   },
   "files": [
     "dist",
@@ -34,7 +38,11 @@
     "prepack": "npm run build",
     "test": "node --test test/*.test.ts",
     "smoke:cli": "node src/cli.ts \"이거 알아서 다 처리해줘\"",
-    "smoke:codex": "node src/adapters/codex.ts < test/fixtures/codex-ambiguous.json"
+    "smoke:codex": "node src/adapters/codex.ts < test/fixtures/codex-ambiguous.json",
+    "smoke:dual-run": "node src/dualrun.ts --prompt \"이거 알아서 다 처리해줘\" --artifacts-root /tmp/readback-gate-dualrun-smoke --baseline-cmd \"node -e 'require(\\\"fs\\\").writeFileSync(\\\"baseline-input.txt\\\", require(\\\"fs\\\").readFileSync(0, \\\"utf8\\\"))'\" --json",
+    "smoke:dual-run-report": "node src/dualrun-report.ts --artifacts-root /tmp/readback-gate-dualrun-smoke --json",
+    "smoke:dual-run-label": "node src/dualrun-label.ts --review-dir /tmp/readback-gate-review-smoke --labels /tmp/readback-gate-labels-smoke.jsonl --labeler-cmd \"node -e 'console.log(JSON.stringify({verdict:\\\"same\\\",confidence:\\\"medium\\\",notes:\\\"smoke\\\"}))'\"",
+    "smoke:dual-run-worker": "node src/dualrun-worker.ts --queue /tmp/readback-gate-dualrun-smoke/queue.jsonl --artifacts-root /tmp/readback-gate-dualrun-smoke --agent-cmd \"node -e 'process.stdin.resume()'\""
   },
   "engines": {
     "node": ">=24.0.0"

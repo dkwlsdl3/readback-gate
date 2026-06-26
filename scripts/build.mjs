@@ -1,8 +1,8 @@
 import { chmodSync, readFileSync, rmSync } from 'node:fs';
 import { build } from 'esbuild';
 
-const entryPoints = ['src/cli.ts', 'src/adapters/codex.ts', 'src/install.ts'];
-const binOutputs = ['dist/cli.js', 'dist/adapters/codex.js'];
+const entryPoints = ['src/cli.ts', 'src/adapters/codex.ts', 'src/install.ts', 'src/dualrun.ts', 'src/dualrun-report.ts', 'src/dualrun-label.ts', 'src/dualrun-worker.ts'];
+const binOutputs = ['dist/cli.js', 'dist/adapters/codex.js', 'dist/dualrun.js', 'dist/dualrun-report.js', 'dist/dualrun-label.js', 'dist/dualrun-worker.js'];
 const shebang = '#!/usr/bin/env node';
 
 rmSync('dist', { recursive: true, force: true });

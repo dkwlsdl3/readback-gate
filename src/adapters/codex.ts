@@ -5,24 +5,7 @@ import type { PromptAdapter, ScoreOptions } from '../core/types.ts';
 import { scorePrompt } from '../core/scorer.ts';
 import { normalizeMode, renderAdditionalContext, renderHumanSummary } from '../core/modes.ts';
 import { recordTelemetry } from '../core/telemetry.ts';
-
-function extractPrompt(rawInput: string): string {
-  if (!rawInput.trim()) return '';
-  try {
-    const payload = JSON.parse(rawInput);
-    return String(
-      payload.prompt ??
-        payload.user_prompt ??
-        payload.userPrompt ??
-        payload.message ??
-        payload.input ??
-        payload.text ??
-        ''
-    );
-  } catch {
-    return rawInput;
-  }
-}
+import { extractPrompt, recordDualRunCapture } from '../dualrun-capture.ts';
 
 function renderHookSpecificOutput(additionalContext: string): string {
   return `${JSON.stringify({
@@ -36,12 +19,17 @@ function renderHookSpecificOutput(additionalContext: string): string {
 export const codexAdapter: PromptAdapter = {
   name: 'codex',
   run(input: string, options: ScoreOptions = {}) {
+    if (process.env.READBACK_GATE_DISABLE === '1' || process.env.READBACK_GATE_DISABLE === 'true') {
+      return { exitCode: 0, stdout: '{}\n' };
+    }
+
     const mode = normalizeMode(options.mode ?? process.env.READBACK_GATE_MODE);
     const threshold = options.threshold ?? Number(process.env.READBACK_GATE_THRESHOLD ?? 70);
     const prompt = extractPrompt(input);
     const report = scorePrompt(prompt, { mode, threshold });
 
     recordTelemetry('prompt_scored', prompt, report, options.telemetryPath);
+    recordDualRunCapture(input, prompt, report, 'codex');
 
     if (report.verdict === 'gate') {
       recordTelemetry('strict_blocked', prompt, report, options.telemetryPath);
